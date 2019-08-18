@@ -1,0 +1,84 @@
+MX_SEED: 215
+NPY_SEED: 215
+DATA_NAME: reddit
+SPLIT_TRAINING: false
+TRAIN_SPLIT_NUM: 20
+LOAD_WALKS: false
+AGGREGATOR:
+  ACTIVATION: leaky
+  GRAPHPOOL:
+    ARGS: [out_units, mid_units, mid_layer_num]
+    POOL_TYPE: avg
+  GRAPH_WEIGHTED_SUM:
+    ARGS: [out_units, mid_units, attend_units]
+    ATTEND_W_DROPOUT: 0.0
+    WEIGHT_ACT: sigmoid
+  MUGGA:
+    ARGS: [out_units, attend_units, value_units, K, context_units, context_layer_num]
+    USE_EDGE: false
+    ATTEND_W_DROPOUT: 0.5
+    CONTEXT:
+      USE_SUM_POOL: false
+      USE_MAX_POOL: true
+      USE_AVG_POOL: true
+      USE_GATE: true
+      USE_SHARPNESS: true
+STATIC_GRAPH:
+  MODEL:
+    TYP: supervised
+    FEATURE_NORMALIZE: true
+    FIRST_EMBED_UNITS: 64
+    AGGREGATOR_ARGS_LIST:
+    - - GraphPoolAggregator
+      - [128, 1024, 1]
+    - - GraphPoolAggregator
+      - [128, 1024, 1]
+    DROPOUT_RATE_LIST: [0.1, 0.1]
+    DENSE_CONNECT: false
+    L2_NORMALIZATION: false
+    EVERY_LAYER_L2_NORMALIZATION: false
+    EMBED_DIM: 64
+    NEG_WEIGHT: 1.0
+    TRAIN_NEG_SAMPLE_SCALE: 0
+    TRAIN_NEG_SAMPLE_REPLACE: false
+    VALID_NEG_SAMPLE_SCALE: 0
+    TEST_NEG_SAMPLE_SCALE: 0
+    TRAIN:
+      BATCH_SIZE: 512
+      GRAPH_SAMPLER_ARGS:
+      - fixed
+      - [25, 10]
+      VALID_ITER: 100
+      TEST_ITER: 100
+      MAX_ITER: 100000
+      OPTIMIZER: adam
+      LR: 0.001
+      MIN_LR: 0.0001
+      DECAY_PATIENCE: 4
+      EARLY_STOPPING_PATIENCE: 10
+      LR_DECAY_FACTOR: 0.5
+      GRAD_CLIP: 1.0
+      WD: 0.0
+    TEST:
+      BATCH_SIZE: 512
+      SAMPLE_NUM: 1
+SPATIOTEMPORAL_GRAPH:
+  IN_LENGTH: 12
+  OUT_LENGTH: 12
+  MODEL:
+    AGGREGATOR_ARGS:
+    - MuGGA
+    - [32, 8, 16, 4, 32, 1]
+    DROPOUT_RATE: 0.0
+    LAYER_NUM: 2
+    USE_EDGE: false
+    TRAIN:
+      MAX_EPOCH: 20
+      OPTIMIZER: adam
+      LR: 0.001
+      MIN_LR: 0.0001
+      DECAY_PATIENCE: 15
+      EARLY_STOPPING_PATIENCE: 30
+      LR_DECAY_FACTOR: 0.5
+      GRAD_CLIP: 10.0
+      WD: 0.0

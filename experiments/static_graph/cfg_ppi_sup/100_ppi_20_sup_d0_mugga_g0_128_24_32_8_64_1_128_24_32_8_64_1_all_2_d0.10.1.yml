@@ -1,0 +1,63 @@
+MX_SEED: 1206
+NPY_SEED: 1206
+DATA_NAME: ppi
+SPLIT_TRAINING: false
+TRAIN_SPLIT_NUM: 20
+LOAD_WALKS: false
+AGGREGATOR:
+  ACTIVATION: leaky
+  GRAPHPOOL:
+    ARGS: [out_units, mid_units, mid_layer_num]
+    POOL_TYPE: max
+  GRAPH_WEIGHTED_SUM:
+    ARGS: [out_units, mid_units, attend_units]
+    ATTEND_W_DROPOUT: 0.0
+    DIVIDE_SIZE: true
+    WEIGHT_ACT: sigmoid
+  MUGGA:
+    ARGS: [out_units, attend_units, value_units, K, context_units, context_layer_num]
+    USE_EDGE: false
+    ATTEND_W_DROPOUT: 0.0
+    CONTEXT:
+      USE_SUM_POOL: false
+      USE_MAX_POOL: true
+      USE_AVG_POOL: true
+      USE_GATE: false
+      USE_SHARPNESS: false
+STATIC_GRAPH:
+  MODEL:
+    TYP: supervised
+    FEATURE_NORMALIZE: false
+    FIRST_EMBED_UNITS: 64
+    AGGREGATOR_ARGS_LIST:
+    - - MuGGA
+      - [128, 24, 32, 8, 64, 1]
+    - - MuGGA
+      - [128, 24, 32, 8, 64, 1]
+    DROPOUT_RATE_LIST: [0.1, 0.1]
+    DENSE_CONNECT: false
+    L2_NORMALIZATION: false
+    EVERY_LAYER_L2_NORMALIZATION: false
+    EMBED_DIM: 64
+    NEG_WEIGHT: 1.0
+    TRAIN_NEG_SAMPLE_SCALE: 0
+    TRAIN_NEG_SAMPLE_REPLACE: false
+    VALID_NEG_SAMPLE_SCALE: 0
+    TEST_NEG_SAMPLE_SCALE: 0
+    TRAIN:
+      BATCH_SIZE: 512
+      GRAPH_SAMPLER_ARGS: [all, 2]
+      VALID_ITER: 100
+      TEST_ITER: 100
+      MAX_ITER: 100000
+      OPTIMIZER: adam
+      LR: 0.01
+      MIN_LR: 0.001
+      DECAY_PATIENCE: 15
+      EARLY_STOPPING_PATIENCE: 30
+      LR_DECAY_FACTOR: 0.5
+      GRAD_CLIP: -1.0
+      WD: 0.0
+    TEST:
+      BATCH_SIZE: 512
+      SAMPLE_NUM: 1
