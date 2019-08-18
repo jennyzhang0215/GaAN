@@ -1,6 +1,6 @@
 # C++ Extensions for Graph Sampler in Python
 
-The sampler of the graph + other misc functions used in our implementation.
+The sampler of the graph.
 
 The graph is assumed to have this format
 - node_types: ...
@@ -8,6 +8,9 @@ The graph is assumed to have this format
 - ind_ptr: ...
 - node_ids: ...
 
+The sampled_graph will have this format
+- Sample a subgraph from the given graph
+- Sample a subgraph from the given graph w.r.t some given nodes
 
 # Install
 For windows users:
@@ -23,20 +26,7 @@ cd ..
 python install.py
 ```
 
-For unix users:
-
-Firstly, install the https://github.com/sparsehash/sparsehash according to the guidelines.
-```bash
-git clone https://github.com/sparsehash/sparsehash
-cd sparsehash
-./configure
-make
-sudo make install
-```
-It will install the header files into some paths like `/usr/local/include`.
-
-Then, use cmake to install the package
-
+For unix users (including macOS and linux):
 ```bash
 mkdir build
 cd build

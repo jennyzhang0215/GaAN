@@ -2,31 +2,19 @@
 #include <iostream>
 #include <cstring>
 #include <algorithm>
+#include <omp.h>
 #include <ctime>
 #include "graph_sampler.h"
 
 //#define MXGRAPH_OMP_THREAD_NUM 8
 
-namespace graph_sampler {
-
-int mxgraph_set_omp_thread_num(int max_num) {
-  int omp_thread_num_used = std::min(omp_get_max_threads(), max_num);
+int mxgraph_set_omp_thread_num() {
+  int omp_thread_num_used = std::min(omp_get_max_threads(), 16);
   omp_set_num_threads(omp_thread_num_used);
   return omp_thread_num_used;
 }
 
-
-struct pairhash {
-public:
-  template <typename T, typename U>
-  std::size_t operator()(const std::pair<T, U> &x) const
-  {
-    std::size_t seed = std::hash<U>()(x.second);
-    seed ^= std::hash<T>(x.first) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
-    return seed;
-  }
-};
-
+namespace graph_sampler {
 
 void slice_csr_mat(const int* src_end_points,
                    const float* src_values,
@@ -57,7 +45,6 @@ void slice_csr_mat(const int* src_end_points,
 
     if(sel_row_indices == nullptr && sel_col_indices == nullptr) {
         //Handle the special case where we could copy the source
-        *dst_nnz = src_nnz;
         *dst_row_ids = new int[src_row_num];
         *dst_col_ids = new int[src_col_num];
         *dst_end_points = new int[src_nnz];
@@ -111,7 +98,7 @@ void slice_csr_mat(const int* src_end_points,
         col_idx_map.insert(std::make_pair(sel_col_indices[i], i));
     }
     ASSERT(col_idx_map.size() == dst_col_num);
-    int global_nnz = 0;
+    int  global_nnz = 0;
     int local_nnz = 0;
 #pragma omp parallel for private(local_nnz) reduction(+:global_nnz)
     for(int i = 0; i < dst_row_num; i++) {
@@ -149,274 +136,6 @@ void slice_csr_mat(const int* src_end_points,
         }
     }
     return;
-}
-
-void remove_edges(const int* end_points,
-                  const float* values,
-                  const int* ind_ptr,
-                  const int* row_indices,
-                  const int* col_indices,
-                  int row_num,
-                  int nnz,
-                  int edge_num,
-                  std::vector<int> *dst_end_points,
-                  std::vector<float> *dst_values,
-                  std::vector<int> *dst_ind_ptr) {
-#if defined(_USE_SPARSEHASH)
-  dense_hash_map<int, dense_hash_set<int> > edges_map;
-  edges_map.set_empty_key(-1);
-#else
-  std::unordered_map<int, std::unordered_set<int>> edges_map;
-#endif
-  for (int i = 0; i < edge_num; i++) {
-    if (edges_map.find(row_indices[i]) == edges_map.end()) {
-#if defined(_USE_SPARSEHASH)
-      edges_map[row_indices[i]] = dense_hash_set<int>();
-      edges_map[row_indices[i]].set_empty_key(-1);
-#else
-      edges_map[row_indices[i]] = std::unordered_set<int>();
-#endif
-    }
-    edges_map[row_indices[i]].insert(col_indices[i]);
-  }
-  dst_ind_ptr->push_back(0);
-  int cnt = 0;
-  for (int i = 0; i < row_num; i++) {
-    auto it = edges_map.find(i);
-    if (it == edges_map.end()) {
-      dst_end_points->insert(dst_end_points->end(), end_points + ind_ptr[i], end_points + ind_ptr[i + 1]);
-      dst_values->insert(dst_values->end(), values + ind_ptr[i], values + ind_ptr[i + 1]);
-      cnt += ind_ptr[i + 1] - ind_ptr[i];
-    } else {
-      for (int j = ind_ptr[i]; j < ind_ptr[i + 1]; j++) {
-        if (it->second.find(end_points[j]) == it->second.end()) {
-          cnt++;
-          dst_end_points->push_back(end_points[j]);
-          dst_values->push_back(values[j]);
-        }
-      }
-    }
-    dst_ind_ptr->push_back(cnt);
-  }
-}
-
-void remove_edges_omp(const int* end_points,
-                      const float* values,
-                      const int* ind_ptr,
-                      const int* row_indices,
-                      const int* col_indices,
-                      int row_num,
-                      int nnz,
-                      int edge_num,
-                      std::vector<int> *dst_end_points,
-                      std::vector<float> *dst_values,
-                      std::vector<int> *dst_ind_ptr) {
-  int thread_num = mxgraph_set_omp_thread_num();
-#if defined(_USE_SPARSEHASH)
-  dense_hash_map<int, dense_hash_set<int>> edges_map;
-  edges_map.set_empty_key(-1);
-#else
-  std::unordered_map<int, std::unordered_set<int>> edges_map;
-#endif
-  for (int i = 0; i < edge_num; i++) {
-    if (edges_map.find(row_indices[i]) == edges_map.end()) {
-#if defined(_USE_SPARSEHASH)
-      edges_map[row_indices[i]] = dense_hash_set<int>();
-      edges_map[row_indices[i]].set_empty_key(-1);
-#else
-      edges_map[row_indices[i]] = std::unordered_set<int>();
-#endif
-    }
-    edges_map[row_indices[i]].insert(col_indices[i]);
-  }
-  (*dst_ind_ptr) = std::vector<int>(row_num + 1, 0);
-  std::vector<std::vector<int>> dst_end_points_by_row(row_num);
-  std::vector<std::vector<float>> dst_values_by_row(row_num);
-  std::vector<bool> find_row(row_num);
-#pragma omp parallel for
-  for (int i = 0; i < row_num; i++) {
-    auto it = edges_map.find(i);
-    if (it == edges_map.end()) {
-      find_row[i] = false;
-    } else {
-      find_row[i] = true;
-      for (int j = ind_ptr[i]; j < ind_ptr[i + 1]; j++) {
-        if (it->second.find(end_points[j]) == it->second.end()) {
-          dst_end_points_by_row[i].push_back(end_points[j]);
-          dst_values_by_row[i].push_back(values[j]);
-        }
-      }
-    }
-  }
-  int new_nnz = 0;
-  for (int i = 0; i < row_num; i++) {
-    if (find_row[i]) {
-      new_nnz += dst_end_points_by_row[i].size();
-    } else {
-      new_nnz += ind_ptr[i + 1] - ind_ptr[i];
-    }
-  }
-  // Copy to results
-  *dst_end_points = std::vector<int>(new_nnz);
-  *dst_values = std::vector<float>(new_nnz);
-  for (int i = 0; i < row_num; i++) {
-    int shift = (*dst_ind_ptr)[i];
-    if (find_row[i]) {
-      (*dst_ind_ptr)[i + 1] = shift + dst_end_points_by_row[i].size();
-      std::copy(dst_end_points_by_row[i].begin(), dst_end_points_by_row[i].end(), dst_end_points->begin() + shift);
-      std::copy(dst_values_by_row[i].begin(), dst_values_by_row[i].end(), dst_values->begin() + shift);
-    } else {
-      (*dst_ind_ptr)[i + 1] = shift + ind_ptr[i + 1] - ind_ptr[i];
-      std::copy(end_points + ind_ptr[i], end_points + ind_ptr[i + 1], dst_end_points->begin() + shift);
-      std::copy(values + ind_ptr[i], values + ind_ptr[i + 1], dst_values->begin() + shift);
-    }
-    
-  }
-}
-
-void multi_link_split_by_value(const float* edge_values,
-                               const int* ind_ptr,
-                               const float* possible_edge_values,
-                               int node_num,
-                               int nnz,
-                               int val_num,
-                               std::vector<std::vector<int>> *split_indices,
-                               std::vector<std::vector<int>> *split_ind_ptrs) {
-  if(nnz > 10000) return multi_link_split_by_value_omp(edge_values, ind_ptr, possible_edge_values,
-                                                       node_num, nnz, val_num, split_indices, split_ind_ptrs);
-#if defined(_USE_SPARSEHASH)
-  dense_hash_map<float, int> val_map;
-  val_map.set_empty_key(-1000);
-#else
-  std::unordered_map<float, int> val_map;
-#endif
-  std::vector<int> cnts;
-  for (int i = 0; i < val_num; i++) {
-    val_map[possible_edge_values[i]] = i;
-    split_indices->emplace_back(std::vector<int>());
-    split_ind_ptrs->push_back({0});
-    cnts.push_back(0);
-  }
-  for (int i = 0; i < node_num; i++) {
-    for (int j = ind_ptr[i]; j < ind_ptr[i + 1]; j++) {
-      auto it = val_map.find(edge_values[j]);
-      ASSERT(it != val_map.end());
-      int cls = it->second;
-      cnts[cls]++;
-      (*split_indices)[cls].push_back(j);
-    }
-    for (int j = 0; j < val_num; j++) {
-      (*split_ind_ptrs)[j].push_back(cnts[j]);
-    }
-  }
-}
-
-void multi_link_split_by_value_omp(const float* edge_values,
-                                   const int* ind_ptr,
-                                   const float* possible_edge_values,
-                                   int node_num,
-                                   int nnz,
-                                   int val_num,
-                                   std::vector<std::vector<int>> *split_indices,
-                                   std::vector<std::vector<int>> *split_ind_ptrs) {
-  int thread_num = mxgraph_set_omp_thread_num();
-#if defined(_USE_SPARSEHASH)
-  dense_hash_map<float, int> val_map;
-  val_map.set_empty_key(-1000);
-#else
-  std::unordered_map<float, int> val_map;
-#endif
-  for (int i = 0; i < val_num; i++) {
-    val_map[possible_edge_values[i]] = i;
-    split_ind_ptrs->emplace_back(std::vector<int>(node_num + 1, 0));
-    split_indices->emplace_back(std::vector<int>());
-  }
-  std::vector<int> node_idx_lookup(nnz);
-  ASSERT(ind_ptr[node_num] == nnz);
-  for (int i = 0; i < node_num; i++) {
-    std::fill(node_idx_lookup.begin() + ind_ptr[i], node_idx_lookup.begin() + ind_ptr[i + 1], i);
-  }
-  std::vector<std::vector<std::vector<int>>> th_split_indices(thread_num);
-  std::vector<std::vector<std::vector<int>>> th_split_ind_ptrs(thread_num);
-#pragma omp parallel for
-  for (int i = 0; i < thread_num; i++) {
-    th_split_indices[i] = std::vector<std::vector<int>>(val_num);
-    th_split_ind_ptrs[i] = std::vector<std::vector<int>>(val_num);
-    for (int j = 0; j < val_num; j++) {
-      th_split_ind_ptrs[i][j] = std::vector<int>(node_num + 1, 0);
-    }
-  }
-#pragma omp parallel for
-  for (int i = 0; i < nnz; i++) {
-    int tid = omp_get_thread_num();
-    auto it = val_map.find(edge_values[i]);
-    ASSERT(it != val_map.end());
-    int cls = it->second;
-    th_split_indices[tid][cls].push_back(i);
-    th_split_ind_ptrs[tid][cls][node_idx_lookup[i]]++;
-  }
-  std::vector<std::vector<int>> val_ptr(val_num);
-  for (int i = 0; i < val_num; i++) {
-    val_ptr[i] = std::vector<int>(thread_num, 0);
-  }
-  omp_set_num_threads(val_num);
-#pragma omp parallel for
-  for (int i = 0; i < val_num; i++) {
-    for (int j = 0; j < node_num; j++) {
-      (*split_ind_ptrs)[i][j + 1] = (*split_ind_ptrs)[i][j];
-      for (int z = 0; z < thread_num; z++) {
-        (*split_indices)[i].insert((*split_indices)[i].end(),
-                                   th_split_indices[z][i].begin() + val_ptr[i][z],
-                                   th_split_indices[z][i].begin() + val_ptr[i][z] + th_split_ind_ptrs[z][i][j]);
-        val_ptr[i][z] += th_split_ind_ptrs[z][i][j];
-        (*split_ind_ptrs)[i][j + 1] += th_split_ind_ptrs[z][i][j];
-      }
-    }
-  }
-}
-
-void gen_row_indices_by_indptr(const int* ind_ptr,
-                               int num,
-                               int nnz,
-                               std::vector<int>* row_indices) {
-  int thread_num = mxgraph_set_omp_thread_num(4);
-  *row_indices = std::vector<int>(nnz);
-  ASSERT(ind_ptr[0] == 0 && ind_ptr[num] == nnz);
-#pragma omp parallel for
-  for (int i = 0; i < num; i++) {
-    for (int j = ind_ptr[i]; j < ind_ptr[i + 1]; j++) {
-      (*row_indices)[j] = i;
-    }
-  }
-}
-
-void get_support(const int* row_degrees,
-                 const int* col_degrees,
-                 const int* ind_ptr,
-                 const int* end_points,
-                 int num,
-                 int nnz,
-                 bool symm,
-                 std::vector<float>* support) {
-  int thread_num = mxgraph_set_omp_thread_num(4);
-  *support = std::vector<float>(nnz, 0);
-  ASSERT(ind_ptr[0] == 0 && ind_ptr[num] == nnz);
-#pragma omp parallel for
-  for (int i = 0; i < num; i++) {
-    int r_deg = row_degrees[i];
-    for (int j = ind_ptr[i]; j < ind_ptr[i + 1]; j++) {
-      if (symm) {
-        int c_deg = col_degrees[end_points[j]];
-        if (r_deg != 0 && c_deg != 0) {
-          (*support)[j] = std::sqrt(1.0f / static_cast<float>(r_deg) / static_cast<float>(c_deg));
-        }
-      } else {
-        if (r_deg != 0) {
-          (*support)[j] = 1.0f / static_cast<float>(r_deg);
-        }
-      }
-    }
-  }
 }
 
 bool check_subgraph(const SimpleGraph& graph,
@@ -695,30 +414,24 @@ void GraphSampler::get_random_walk_nodes(const int* src_end_points,
   return;
 }
 
-void uniform_choice_range(int* dst, int p_begin, int p_end, int num, bool replace, RANDOM_ENGINE* gen) {
+void uniform_choice_set(int* dst, const int* src, int p_begin, int p_end, int num, bool replace, RANDOM_ENGINE* gen) {
   if(replace) {
     std::uniform_int_distribution<int> dis(p_begin, p_end - 1);
     for(int i = 0; i < num; i++) {
-      dst[i] = dis(*gen);
+      dst[i] = src[dis(*gen)];
     }
   } else {
-#if defined(_USE_SPARSEHASH)
-    dense_hash_map<int, int> pool;
-    pool.set_empty_key(-1000);
-    dense_hash_map<int, int>::iterator it;
-#else
     std::unordered_map<int, int> pool;
     std::unordered_map<int, int>::iterator it;
-#endif
     for(int lower = 0; lower < num; lower++) {
-      std::uniform_int_distribution<int> dis(lower, p_end - p_begin - 1);
+      std::uniform_int_distribution<int> dis(lower, num - 1);
       int sample_val = dis(*gen);
       it = pool.find(sample_val);
       if (it != pool.end()) {
-        dst[lower] = it->second + p_begin;
+        dst[lower] = src[it->second + p_begin];
       }
       else {
-        dst[lower] = sample_val + p_begin;
+        dst[lower] = src[sample_val + p_begin];
       }
       it = pool.find(lower);
       if (it != pool.end()) {
@@ -727,53 +440,6 @@ void uniform_choice_range(int* dst, int p_begin, int p_end, int num, bool replac
       else {
         pool[sample_val] = lower;
       }
-    }
-  }
-}
-
-void uniform_choice_set(int* dst, const int* src, int p_begin, int p_end, int num, bool replace, RANDOM_ENGINE* gen) {
-  uniform_choice_range(dst, p_begin, p_end, num, replace, gen);
-  for(int i = 0; i < num; i++) {
-    dst[i] = src[dst[i]];
-  }
-}
-
-
-void GraphSampler::random_sample_fix_neighbor(const int* src_ind_ptr,
-                                              const int* sel_indices,
-                                              int sel_node_num,
-                                              int neighbor_num,
-                                              std::vector<int>* sampled_indices,
-                                              std::vector<int>* dst_ind_ptr) {
-  *dst_ind_ptr = std::vector<int>(sel_node_num + 1);
-  (*dst_ind_ptr)[0] = 0;
-  // Fill in the indptr, get the dst_nnz
-  for(int i = 0; i < sel_node_num; i++) {
-    int ind = sel_indices[i];
-    int p_begin = src_ind_ptr[ind];
-    int p_end = src_ind_ptr[ind + 1];
-    int sample_num = (neighbor_num < 0) ? p_end - p_begin : std::min(neighbor_num, p_end - p_begin);
-    (*dst_ind_ptr)[i + 1] = sample_num + (*dst_ind_ptr)[i];
-  }
-  int dst_nnz = (*dst_ind_ptr)[sel_node_num];
-  ASSERT(dst_nnz >= 0);
-  // Fill the sampled_indices
-  *sampled_indices = std::vector<int>(dst_nnz);
-  int omp_thread_num_used = mxgraph_set_omp_thread_num();
-#pragma omp parallel for
-  for(int i = 0; i < sel_node_num; i++) {
-    int tid = omp_get_thread_num();
-    int ind = sel_indices[i];
-    int p_begin = src_ind_ptr[ind];
-    int p_end = src_ind_ptr[ind + 1];
-    int shift = (*dst_ind_ptr)[i];
-    int sample_num = (*dst_ind_ptr)[i + 1] - (*dst_ind_ptr)[i];
-    if(sample_num == p_end - p_begin) {
-        for(int j = 0; j < p_end - p_begin; j++) {
-            (*sampled_indices)[shift + j] = p_begin + j;
-        }
-    } else {
-        uniform_choice_range(sampled_indices->data() + shift, p_begin, p_end, sample_num, false, &this->eng_[tid]);
     }
   }
 }
