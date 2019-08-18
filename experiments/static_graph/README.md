@@ -4,16 +4,5 @@
 ```bash
 python sup_train_sample.py --cfg yourcfgfilename --ctx gpu0
 ```
-- unsupervised training
-```bash
-python unsup_train_sample.py --cfg yourcfgfilename --ctx gpu0
-```
 
-
-# Get Readable Result from Directory
-
-```bash
-python result_parser.py --dir DIR_PATH
-```
-
-
+The sample cfg files are in the cfg_ppi_sup dir and cfg_reddit_sup dir.

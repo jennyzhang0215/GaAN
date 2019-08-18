@@ -13,9 +13,12 @@ Install the graph sampler by following the guide in [GraphSampler](GraphSampler)
 python setup.py develop
 ```
 
-## Download atasets
+## Download datasets
 You can download the datasets via the *download_data.py script. The usage is like
 ```bash
 python download_data.py --dataset all
 ```
 The --dataset hyperparameter can be 'cora', 'ppi', and 'reddit'.
+
+## Run experiments
+The script is experiments/static_graph/sup_train_sample.py. 
