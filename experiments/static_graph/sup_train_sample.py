@@ -191,11 +191,11 @@ def train(args, net, loss_function, data_iterator):
 
         layer0_features_nd, end_points_l, indptr_l, indices_in_merged_l, labels_nd, node_ids_l =\
             data_iterator.sample()
-        print("layer0_features_nd", layer0_features_nd.shape, "\n", layer0_features_nd)
-        print("end_points_l", len(end_points_l), end_points_l)
-        print("indptr_l", len(indptr_l), indptr_l)
-        print("indices_in_merged_l", len(indices_in_merged_l), indices_in_merged_l)
-        print("labels_nd", labels_nd.shape, "\n", labels_nd)
+        # print("layer0_features_nd", layer0_features_nd.shape, "\n", layer0_features_nd)
+        # print("end_points_l", len(end_points_l), end_points_l)
+        # print("indptr_l", len(indptr_l), indptr_l)
+        # print("indices_in_merged_l", len(indices_in_merged_l), indices_in_merged_l)
+        # print("labels_nd", labels_nd.shape, "\n", labels_nd)
         #print("node_id", node_ids_l[0].shape, node_ids_l[1].shape,node_ids_l[2].shape)
         with mx.autograd.record():
             if net._output_inner_result:
