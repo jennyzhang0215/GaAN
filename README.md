@@ -18,4 +18,4 @@ You can download the datasets via the *download_data.py script. The usage is lik
 ```bash
 python download_data.py --dataset all
 ```
-The --dataset hyperparameter can be 'cora', 'ppi', 'reddit', and 'all'.
+The --dataset hyperparameter can be 'cora', 'ppi', and 'reddit'.
