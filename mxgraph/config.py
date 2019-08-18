@@ -20,8 +20,8 @@ __C.DATASET_PATH = os.path.join(__C.ROOT_DIR, 'datasets')
 # DATA NAME
 # Used by symbols factories who need to adjust for different
 # inputs based on dataset used. Should be set by the script.
-__C.DATA_NAME = 'movielens'  # choice: ppi; reddit; movielens
-__C.DATA_VERSION = "ml-100k"
+__C.DATA_NAME = 'ppi'  # choice: ppi; reddit; movielens
+__C.DATA_VERSION = ""
 __C.SPLIT_TRAINING = False
 __C.TRAIN_SPLIT_NUM = 20
 __C.LOAD_WALKS = False
