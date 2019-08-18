@@ -46,24 +46,19 @@ parser.add_argument('--dataset', type=str, default='cora', help='the dataset nam
 
 args = parser.parse_args()
 download_jobs = []
-if args.dataset == "cora":
-    download_jobs.append(download_cora)
-elif args.dataset == "ppi":
+#if args.dataset == "cora":
+#    download_jobs.append(download_cora)
+if args.dataset == "ppi":
     download_jobs.append(download_ppi)
 elif args.dataset == "reddit":
     download_jobs.append(download_reddit)
-elif args.dataset == "traffic":
-    download_jobs.extend(download_traffic)
+#elif args.dataset == "traffic":
+#    download_jobs.extend(download_traffic)
 elif args.dataset == "all":
-    download_jobs.append(download_cora)
+#    download_jobs.append(download_cora)
     download_jobs.append(download_ppi)
     download_jobs.append(download_reddit)
-    download_jobs.extend(download_traffic)
-### temporary use
-elif args.dataset == "ppi_Graphsage":
-    download_jobs.append(download_ppi_Graphsage)
-elif args.dataset == "reddit_Graphsage":
-    download_jobs.append(download_reddit_Graphsage)
+#    download_jobs.extend(download_traffic)
 
 for target_path, src_path in download_jobs:
     if not os.path.exists(target_path) or args.overwrite:
@@ -88,26 +83,14 @@ def unzip_dataset(data_name):
         subprocess.call(["unzip", "datasets/reddit.zip", "-d", "datasets/reddit"])
         subprocess.call(["rm", "datasets/reddit.zip"])
         print("Downloaded the reddit dataset!\n")
-    elif data_name == "ppi_Graphsage":
-        subprocess.call(["unzip", "datasets/ppi_Graphsage.zip", "-d", "datasets/ppi_Graphsage"])
-        subprocess.call(["rm", "datasets/ppi_Graphsage.zip"])
-        print("Downloaded the ppi_Graphsage dataset!\n")
-    elif data_name == "reddit_Graphsage":
-        subprocess.call(["unzip", "datasets/reddit_Graphsage.zip", "-d", "datasets/reddit_Graphsage"])
-        subprocess.call(["rm", "datasets/reddit_Graphsage.zip"])
-        print("Downloaded the reddit_Graphsage dataset!\n")
 
 import subprocess
 
-if args.dataset == "cora" or args.dataset == "all":
-    unzip_dataset("cora")
+#if args.dataset == "cora" or args.dataset == "all":
+#    unzip_dataset("cora")
 if args.dataset == "ppi" or args.dataset == "all":
     unzip_dataset("ppi")
 if args.dataset == "reddit" or args.dataset == "all":
     unzip_dataset("reddit")
-if args.dataset == "ppi_Graphsage":
-    unzip_dataset("ppi_Graphsage")
-if args.dataset == "reddit_Graphsage":
-    unzip_dataset("reddit_Graphsage")
 
 subprocess.call(["rm", "-fr", "datasets/__MACOSX"])
