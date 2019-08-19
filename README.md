@@ -18,7 +18,7 @@ python setup.py develop
 ## Download datasets
 You can download the datasets via the *download_data.py script. The usage is like
 ```bash
-python download_data.py --dataset all
+python download_data.py --dataset ppi
 ```
 The --dataset hyperparameter can be 'cora', 'ppi', and 'reddit'.
 
