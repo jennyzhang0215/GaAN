@@ -26,6 +26,7 @@ The --dataset hyperparameter can be 'cora', 'ppi', and 'reddit'.
 The script is experiments/static_graph/sup_train_sample.py. 
 
 ## Citation
+```
 @inproceedings{zhang18,
   author    = {Jiani Zhang and Xingjian Shi and Junyuan Xie and Hao Ma and Irwin King and Dit{-}Yan Yeung},
   title     = {GaAN: Gated Attention Networks for Learning on Large and Spatiotemporal Graphs},
@@ -33,3 +34,4 @@ The script is experiments/static_graph/sup_train_sample.py.
   pages     = {339--349},
   year      = {2018}
 }
+```
